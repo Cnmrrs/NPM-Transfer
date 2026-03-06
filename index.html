@@ -41,7 +41,11 @@
 
     <!-- Header (Sticky Top) -->
     <header class="bg-npm-dark border-b border-gray-800 p-3 flex items-center justify-between z-20 shrink-0">
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 sm:gap-3">
+            <!-- YENİ: NPM Uygulamaları Butonu -->
+            <button id="apps-menu-btn" class="text-gray-400 hover:text-white transition-colors p-1" title="NPM Uygulamaları">
+                <i class="ph ph-squares-four text-2xl"></i>
+            </button>
             <div class="bg-npm-red p-1.5 rounded text-white flex items-center justify-center w-8 h-8">
                 <i class="ph ph-package text-xl"></i>
             </div>
@@ -78,7 +82,6 @@
                             <button onclick="copyMyId()" id="copy-id-btn" class="p-2 bg-gray-800 hover:bg-gray-700 rounded transition-colors text-white" title="Adresi Kopyala">
                                 <i class="ph ph-copy text-lg"></i>
                             </button>
-                            <!-- Yeni: Paylaşım Linki Kopyalama Butonu -->
                             <button onclick="copyShareLink()" id="share-link-btn" class="p-2 bg-blue-900/40 border border-blue-800 hover:bg-blue-800 rounded transition-colors text-blue-400 hover:text-white" title="Davet Linkini Kopyala">
                                 <i class="ph ph-link-simple text-lg"></i>
                             </button>
@@ -93,9 +96,13 @@
                         <i class="ph ph-plugs-connected text-npm-red"></i> Adrese Bağlan
                     </h2>
                     <div class="flex gap-2">
-                        <input type="text" id="target-id" placeholder="NPM Adresi girin..." 
-                            class="flex-1 bg-npm-darker border border-gray-700 rounded-lg p-3 text-white font-mono focus:outline-none focus:border-npm-red uppercase text-sm">
-                        <button id="connect-btn" class="bg-npm-red hover:bg-red-700 text-white font-bold px-4 rounded-lg transition-colors flex items-center justify-center">
+                        <!-- YENİ: Sabit NPM- Prefix'li Input Alanı -->
+                        <div class="flex-1 bg-npm-darker border border-gray-700 rounded-lg flex items-center focus-within:border-npm-red transition-colors px-3 py-3 overflow-hidden cursor-text" onclick="document.getElementById('target-id').focus()">
+                            <span class="text-gray-500 font-mono text-sm select-none font-bold">NPM-</span>
+                            <input type="text" id="target-id" placeholder="XXXXX" maxlength="5"
+                                class="bg-transparent text-white font-mono focus:outline-none uppercase w-full text-sm ml-1 placeholder-gray-600">
+                        </div>
+                        <button id="connect-btn" class="bg-npm-red hover:bg-red-700 text-white font-bold px-4 rounded-lg transition-colors flex items-center justify-center shrink-0">
                             <i class="ph ph-link text-xl"></i>
                         </button>
                     </div>
@@ -115,7 +122,6 @@
                             <p id="connected-peer-id" class="font-mono text-sm text-white font-bold"></p>
                         </div>
                     </div>
-                    <!-- Geliştirilmiş Bağlantı Kesme Butonu -->
                     <button id="disconnect-btn" class="flex items-center gap-1.5 text-xs font-bold text-red-400 hover:text-white bg-red-900/20 border border-red-900/50 hover:bg-red-600 px-3 py-1.5 rounded-md transition-colors">
                         <i class="ph ph-power"></i> Bağlantıyı Kes
                     </button>
@@ -210,7 +216,6 @@
         // ==========================================
         const DB_NAME = 'NPMVaultDB';
         let db;
-        // Transfer sırasında bellekte tutulan dosyalar (Manuel indirme ve kasaya kaydetmek için referans)
         const fileMemoryCache = {}; 
         let fileToSaveId = null;
 
@@ -360,7 +365,6 @@
             };
         }
 
-        // --- YENİ: Toplu ZIP Export Özelliği ---
         async function exportVaultAsZip() {
             if (!db) return alert("Veritabanı hazır değil.");
             const tx = db.transaction('files', 'readonly');
@@ -378,7 +382,6 @@
 
                 const zip = new JSZip();
                 
-                // Kategorilere göre klasör oluşturup dosyaları ekle
                 files.forEach(f => {
                     zip.folder(f.category).file(f.name, f.blob);
                 });
@@ -446,7 +449,6 @@
 
         const myWalletId = generateWalletId();
         
-        // YENİ: Adresi anında UI'a yansıtıyoruz (sunucu yanıtını beklemeden)
         document.getElementById('my-id').innerText = myWalletId;
 
         let peer = null;
@@ -461,18 +463,28 @@
         let incomingBytesReceived = 0;
 
         function initPeer() {
-            peer = new Peer(myWalletId, { debug: 0 });
+            // YENİ: Bağlantı gücünü artırmak için Google STUN sunucuları eklendi
+            peer = new Peer(myWalletId, { 
+                debug: 0,
+                config: {
+                    'iceServers': [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:stun2.l.google.com:19302' }
+                    ]
+                }
+            });
 
             peer.on('open', (id) => {
-                reconnectAttempts = 0; // Bağlantı başarılı olduğunda sayacı sıfırla
-                document.getElementById('my-id').innerText = id; // Kesinleşen ID
+                reconnectAttempts = 0; 
+                document.getElementById('my-id').innerText = id; 
                 setStatus('Ağa Bağlı', 'bg-green-500');
 
-                // Otomatik Bağlantı Linki Kontrolü
                 const urlParams = new URLSearchParams(window.location.search);
                 const connectId = urlParams.get('connect');
                 if (connectId && connectId !== myWalletId) {
-                    document.getElementById('target-id').value = connectId;
+                    // Sadece koddaki 5 harfli kısmı input'a aktarıyoruz, NPM- ön eki arayüzde sabit
+                    document.getElementById('target-id').value = connectId.replace('NPM-', '');
                     setTimeout(() => document.getElementById('connect-btn').click(), 500);
                     window.history.replaceState({}, document.title, window.location.pathname);
                 }
@@ -483,14 +495,12 @@
                     setStatus('Hata!', 'bg-red-500');
                     alert("NPM Adresi bulunamadı veya çevrimdışı.");
                 } else if (err.type === 'network' || err.type === 'server-error' || err.type === 'unavailable-id') {
-                    // Konsol spamını önlemek için bu hataları sessize aldık, sadece UI güncelleniyor
                     setStatus('Sunucu Hatası', 'bg-red-500');
                 } else {
                     console.error("PeerJS Hatası:", err);
                 }
             });
 
-            // YENİ EKLENEN KISIM: Sunucu bağlantısı koparsa otomatik yeniden bağlanma (GELİŞTİRİLDİ)
             peer.on('disconnected', () => {
                 if (peer.destroyed) return;
 
@@ -498,7 +508,6 @@
                     reconnectAttempts++;
                     setStatus(`Yeniden Bağlanıyor (${reconnectAttempts}/${MAX_RECONNECT})...`, 'bg-yellow-500');
                     
-                    // Giderek artan bekleme süresi (Backoff: 3s, 6s, 9s...)
                     setTimeout(() => {
                         if (!peer.destroyed && peer.disconnected) {
                             peer.reconnect();
@@ -518,13 +527,17 @@
         }
 
         document.getElementById('connect-btn').addEventListener('click', () => {
-            const targetId = document.getElementById('target-id').value.trim().toUpperCase();
-            if (!targetId || targetId === myWalletId) return;
+            // YENİ: Girilen koda 'NPM-' ön ekini programatik olarak ekliyoruz
+            const inputVal = document.getElementById('target-id').value.trim().toUpperCase();
+            if (!inputVal) return;
+            
+            const targetId = 'NPM-' + inputVal;
+            if (targetId === myWalletId) return alert("Kendi kendinize bağlanamazsınız.");
+            
             setStatus('Aranıyor...', 'bg-yellow-500');
             setupConnection(peer.connect(targetId, { reliable: true }));
         });
 
-        // Bağlantı Kesme (Disconnect) İşlemi
         function disconnectPeer() {
             if (activeConnection) {
                 activeConnection.close();
