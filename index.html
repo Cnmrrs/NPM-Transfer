@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NPM Transfer & Kasa</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- PeerJS (WebRTC P2P Ağ Kütüphanesi) -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        npm: { red: '#cb3837', dark: '#1e1e1e', darker: '#121212', panel: '#252526' }
+                    },
+                    fontFamily: {
+                        mono: ['"Fira Code"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #121212; color: #e5e7eb; overflow: hidden; overscroll-behavior-y: none; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; }
+        .drag-active { border-color: #cb3837 !important; background-color: rgba(203, 56, 55, 0.1) !important; }
+        .glass-panel { background: #252526; border: 1px solid #333; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5); }
+        .tab-active { color: #cb3837; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col font-sans antialiased selection:bg-npm-red selection:text-white">
+
+    <!-- Header (Sticky Top) -->
+    <header class="bg-npm-dark border-b border-gray-800 p-3 flex items-center justify-between z-20 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="bg-npm-red p-1.5 rounded text-white flex items-center justify-center w-8 h-8">
+                <i class="ph ph-package text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold text-white tracking-wide leading-tight">NPM <span class="font-light text-gray-400">Vault</span></h1>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 text-xs font-mono">
+            <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse"></span>
+            <span id="status-text" class="text-gray-400 hidden sm:inline">Bağlanıyor...</span>
+        </div>
+    </header>
+
+    <!-- Main Content Area (Scrollable) -->
+    <main class="flex-1 overflow-y-auto pb-20 relative hide-scroll">
+        
+        <!-- ==================== TAB 1: TRANSFER EKRANI ==================== -->
+        <div id="view-transfer" class="p-4 max-w-5xl mx-auto space-y-4 animate-fade-in block">
+            
+            <!-- Connection Cards (Grid on Desktop, Stacked on Mobile) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- My Wallet Box -->
+                <div class="glass-panel rounded-xl p-5 relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 w-24 h-24 bg-npm-red opacity-10 rounded-bl-full transform translate-x-8 -translate-y-8"></div>
+                    <h2 class="text-xs text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <i class="ph ph-identification-card text-npm-red"></i> Sizin NPM Adresiniz
+                    </h2>
+                    <div class="bg-npm-darker p-3 rounded-lg border border-gray-800 flex items-center justify-between">
+                        <span id="my-id" class="font-mono text-lg text-white font-bold">...</span>
+                        <button onclick="copyMyId()" class="p-2 bg-gray-800 hover:bg-gray-700 rounded transition-colors text-white">
+                            <i class="ph ph-copy text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Connect Box -->
+                <div class="glass-panel rounded-xl p-5">
+                    <h2 class="text-xs text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <i class="ph ph-plugs-connected text-npm-red"></i> Adrese Bağlan
+                    </h2>
+                    <div class="flex gap-2">
+                        <input type="text" id="target-id" placeholder="NPM Adresi girin..." 
+                            class="flex-1 bg-npm-darker border border-gray-700 rounded-lg p-3 text-white font-mono focus:outline-none focus:border-npm-red uppercase text-sm">
+                        <button id="connect-btn" class="bg-npm-red hover:bg-red-700 text-white font-bold px-4 rounded-lg transition-colors flex items-center justify-center">
+                            <i class="ph ph-link text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transfer UI (Appears when connected) -->
+            <div id="transfer-ui" class="glass-panel rounded-xl flex flex-col hidden overflow-hidden border border-gray-700 mt-4">
+                <div class="bg-npm-dark p-3 border-b border-gray-800 flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full bg-green-900/30 text-green-500 flex items-center justify-center border border-green-800">
+                            <i class="ph ph-user-circle-gear text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-gray-400 leading-none">Bağlı Cihaz</p>
+                            <p id="connected-peer-id" class="font-mono text-sm text-white font-bold"></p>
+                        </div>
+                    </div>
+                    <button id="disconnect-btn" class="text-gray-400 hover:text-red-500 bg-gray-800 hover:bg-gray-700 p-2 rounded-md transition-colors">
+                        <i class="ph ph-x-circle text-lg"></i>
+                    </button>
+                </div>
+
+                <!-- Dropzone -->
+                <div id="dropzone" class="p-6 sm:p-10 flex flex-col items-center justify-center border-b border-gray-800 border-dashed bg-npm-darker cursor-pointer hover:border-npm-red transition-colors min-h-[150px]">
+                    <i class="ph ph-cloud-arrow-up text-4xl text-npm-red mb-2 drop-shadow-lg"></i>
+                    <h3 class="text-base font-medium text-white mb-1">Dosya Seç veya Sürükle</h3>
+                    <input type="file" id="file-input" class="hidden" multiple>
+                </div>
+            </div>
+
+            <!-- Transfer Queue -->
+            <div class="glass-panel rounded-xl p-4 min-h-[200px]">
+                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i class="ph ph-swap text-lg"></i> Aktarım Geçmişi
+                </h4>
+                <div id="transfer-list" class="space-y-2">
+                    <p id="empty-history" class="text-sm text-gray-600 italic text-center py-4">Henüz bir işlem yok.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB 2: KASA (YILDIZLILAR) ==================== -->
+        <div id="view-vault" class="p-4 max-w-5xl mx-auto space-y-4 hidden animate-fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="ph-fill ph-star text-yellow-500"></i> Dosya Kasası
+                    </h2>
+                    <p class="text-xs text-gray-500">Cihazına kaydedilen özel dosyaların</p>
+                </div>
+                <!-- Toplam Boyut Göstergesi -->
+                <div class="bg-gray-800 px-3 py-1 rounded-full text-xs font-mono text-gray-300 border border-gray-700">
+                    <span id="vault-total-size">0 MB</span>
+                </div>
+            </div>
+
+            <!-- Kategoriler Konteyneri -->
+            <div id="vault-categories" class="space-y-4 pb-10">
+                <!-- Javascript ile doldurulacak -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Kategori Kaydetme Modalı -->
+    <div id="save-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex-items-center justify-center p-4">
+        <div class="bg-npm-panel border border-gray-700 rounded-xl w-full max-w-sm p-5 shadow-2xl mt-32 mx-auto">
+            <h3 class="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                <i class="ph-fill ph-star text-yellow-500"></i> Kasaya Kaydet
+            </h3>
+            <p class="text-sm text-gray-400 mb-4 truncate" id="modal-filename">dosya.txt</p>
+            
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-gray-500 mb-1 block">Kategori Seç veya Yaz</label>
+                    <input type="text" id="category-input" list="category-list" placeholder="Örn: Belgeler, Resimler..." 
+                        class="w-full bg-npm-darker border border-gray-600 rounded-lg p-2.5 text-white text-sm focus:border-npm-red focus:outline-none">
+                    <datalist id="category-list">
+                        <!-- JS Dolduracak -->
+                    </datalist>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button onclick="closeSaveModal()" class="flex-1 py-2 rounded-lg bg-gray-800 text-white text-sm font-medium hover:bg-gray-700">İptal</button>
+                    <button id="confirm-save-btn" class="flex-1 py-2 rounded-lg bg-yellow-600 text-white text-sm font-bold hover:bg-yellow-500">Kaydet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation (Mobile & Desktop) -->
+    <nav class="fixed bottom-0 w-full bg-npm-darker border-t border-gray-800 px-6 py-2 pb-safe z-40 flex justify-around sm:justify-center sm:gap-16 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+        <button onclick="switchTab('transfer')" id="nav-transfer" class="flex flex-col items-center p-2 tab-active transition-colors w-20">
+            <i class="ph ph-swap text-2xl mb-1"></i>
+            <span class="text-[10px] font-medium uppercase tracking-wider">Transfer</span>
+        </button>
+        <button onclick="switchTab('vault')" id="nav-vault" class="flex flex-col items-center p-2 text-gray-500 hover:text-gray-300 transition-colors w-20 relative">
+            <i class="ph ph-folder-star text-2xl mb-1"></i>
+            <span class="text-[10px] font-medium uppercase tracking-wider">Kasa</span>
+        </button>
+    </nav>
+
+    <script>
+        // ==========================================
+        // 1. VERİTABANI YÖNETİMİ (INDEXED DB)
+        // ==========================================
+        const DB_NAME = 'NPMVaultDB';
+        let db;
+        // Transfer sırasında bellekte tutulan dosyalar (kaydetmek için referans)
+        const fileMemoryCache = {}; 
+        let fileToSaveId = null;
+
+        function initDB() {
+            const request = indexedDB.open(DB_NAME, 1);
+            
+            request.onupgradeneeded = (e) => {
+                db = e.target.result;
+                // Dosyalar tablosu
+                if (!db.objectStoreNames.contains('files')) {
+                    const store = db.createObjectStore('files', { keyPath: 'id' });
+                    store.createIndex('category', 'category', { unique: false });
+                }
+            };
+
+            request.onsuccess = (e) => {
+                db = e.target.result;
+                loadVaultData(); // Açılışta kasayı yükle
+            };
+            
+            request.onerror = (e) => console.error("DB Hatası:", e);
+        }
+
+        async function saveFileToVault(fileId, categoryName) {
+            const fileData = fileMemoryCache[fileId];
+            if (!fileData || !db) return;
+
+            const record = {
+                id: fileId,
+                name: fileData.name,
+                blob: fileData.blob,
+                size: fileData.size,
+                type: fileData.type,
+                category: categoryName || 'Genel',
+                timestamp: Date.now()
+            };
+
+            const tx = db.transaction('files', 'readwrite');
+            const store = tx.objectStore('files');
+            store.put(record);
+
+            tx.oncomplete = () => {
+                // UI Güncelle
+                const btn = document.getElementById('star-btn-' + fileId);
+                if(btn) {
+                    btn.innerHTML = '<i class="ph-fill ph-star text-yellow-500"></i>';
+                    btn.classList.add('pointer-events-none');
+                }
+                closeSaveModal();
+                loadVaultData(); // Kasayı yenile
+            };
+        }
+
+        function deleteFromVault(id) {
+            if(!confirm("Dosyayı kasadan silmek istiyor musunuz?")) return;
+            const tx = db.transaction('files', 'readwrite');
+            tx.objectStore('files').delete(id);
+            tx.oncomplete = () => loadVaultData();
+        }
+
+        // ==========================================
+        // 2. KASA UI OLUŞTURMA (KATEGORİLER)
+        // ==========================================
+        function loadVaultData() {
+            if (!db) return;
+            const tx = db.transaction('files', 'readonly');
+            const store = tx.objectStore('files');
+            const request = store.getAll();
+
+            request.onsuccess = () => {
+                const files = request.result;
+                renderVaultUI(files);
+                updateCategoryDatalist(files);
+            };
+        }
+
+        function renderVaultUI(files) {
+            const container = document.getElementById('vault-categories');
+            container.innerHTML = '';
+            
+            let totalBytes = 0;
+            const categories = {};
+
+            // Dosyaları kategorilere ayır
+            files.forEach(f => {
+                totalBytes += f.size;
+                if(!categories[f.category]) categories[f.category] = [];
+                categories[f.category].push(f);
+            });
+
+            document.getElementById('vault-total-size').innerText = formatBytes(totalBytes);
+
+            if(Object.keys(categories).length === 0) {
+                container.innerHTML = `<div class="text-center p-8 border border-gray-800 border-dashed rounded-xl bg-npm-darker"><i class="ph ph-folder-open text-4xl text-gray-600 mb-2"></i><p class="text-gray-500 text-sm">Kasada hiç dosya yok.</p></div>`;
+                return;
+            }
+
+            // Kategorileri UI'a bas
+            for (const [catName, catFiles] of Object.entries(categories)) {
+                // Kategori Başlığı
+                const catHtml = `
+                    <div class="bg-npm-darker border border-gray-800 rounded-xl overflow-hidden">
+                        <div class="bg-gray-800/50 p-3 flex items-center justify-between border-b border-gray-800">
+                            <h3 class="font-medium text-white text-sm flex items-center gap-2">
+                                <i class="ph-fill ph-folder text-npm-red"></i> ${catName}
+                            </h3>
+                            <span class="text-xs bg-gray-700 px-2 py-0.5 rounded-full text-gray-300">${catFiles.length} Dosya</span>
+                        </div>
+                        <div class="divide-y divide-gray-800">
+                            ${catFiles.map(f => createVaultItemHtml(f)).join('')}
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', catHtml);
+            }
+        }
+
+        function createVaultItemHtml(file) {
+            return `
+                <div class="p-3 flex items-center justify-between hover:bg-gray-800/30 transition-colors">
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <i class="ph ph-file text-xl text-gray-400 shrink-0"></i>
+                        <div class="truncate">
+                            <p class="text-sm text-white truncate">${file.name}</p>
+                            <p class="text-[10px] text-gray-500">${formatBytes(file.size)} • ${new Date(file.timestamp).toLocaleDateString()}</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 shrink-0">
+                        ${activeConnection ? `<button onclick="sendFromVault('${file.id}')" class="w-8 h-8 rounded bg-npm-dark hover:bg-npm-red flex items-center justify-center transition-colors text-white" title="Bağlı Cihaza Gönder"><i class="ph ph-paper-plane-tilt"></i></button>` : ''}
+                        <button onclick="downloadFromVault('${file.id}')" class="w-8 h-8 rounded bg-npm-dark hover:bg-gray-700 flex items-center justify-center transition-colors text-white" title="Cihaza İndir"><i class="ph ph-download-simple"></i></button>
+                        <button onclick="deleteFromVault('${file.id}')" class="w-8 h-8 rounded bg-npm-dark hover:bg-red-900/50 flex items-center justify-center transition-colors text-red-400" title="Sil"><i class="ph ph-trash"></i></button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateCategoryDatalist(files) {
+            const list = document.getElementById('category-list');
+            const uniqueCats = [...new Set(files.map(f => f.category))];
+            list.innerHTML = uniqueCats.map(c => `<option value="${c}">`).join('');
+        }
+
+        function downloadFromVault(id) {
+            const tx = db.transaction('files', 'readonly');
+            tx.objectStore('files').get(id).onsuccess = (e) => {
+                const record = e.target.result;
+                if(record) downloadFile(record.blob, record.name);
+            };
+        }
+
+        // ==========================================
+        // 3. UI TAB VE MODAL KONTROLLERİ
+        // ==========================================
+        function switchTab(tabId) {
+            document.getElementById('view-transfer').classList.add('hidden');
+            document.getElementById('view-vault').classList.add('hidden');
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+
+            document.getElementById('nav-transfer').classList.remove('tab-active');
+            document.getElementById('nav-vault').classList.remove('tab-active');
+            document.getElementById('nav-transfer').classList.add('text-gray-500');
+            document.getElementById('nav-vault').classList.add('text-gray-500');
+
+            document.getElementById(`nav-${tabId}`).classList.remove('text-gray-500');
+            document.getElementById(`nav-${tabId}`).classList.add('tab-active');
+
+            // Kasaya geçerken UI'ı yenile ki güncel bağlantı durumuna göre "Gönder" butonları gelsin
+            if(tabId === 'vault') loadVaultData();
+        }
+
+        function openSaveModal(fileId) {
+            fileToSaveId = fileId;
+            document.getElementById('modal-filename').innerText = fileMemoryCache[fileId].name;
+            document.getElementById('save-modal').classList.remove('hidden');
+            document.getElementById('category-input').value = '';
+            document.getElementById('category-input').focus();
+        }
+
+        function closeSaveModal() {
+            document.getElementById('save-modal').classList.add('hidden');
+            fileToSaveId = null;
+        }
+
+        document.getElementById('confirm-save-btn').addEventListener('click', () => {
+            let cat = document.getElementById('category-input').value.trim();
+            if(!cat) cat = "Genel";
+            saveFileToVault(fileToSaveId, cat);
+        });
+
+        // ==========================================
+        // 4. WEBRTC MANTIĞI VE TRANSFER
+        // ==========================================
+        const generateWalletId = () => {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let id = 'NPM-';
+            for(let i=0; i<5; i++) id += chars.charAt(Math.floor(Math.random() * chars.length));
+            return id;
+        };
+
+        const myWalletId = generateWalletId();
+        let peer = null;
+        let activeConnection = null;
+
+        const CHUNK_SIZE = 256 * 1024;
+        let incomingFileInfo = null;
+        let incomingFileData = [];
+        let incomingBytesReceived = 0;
+
+        function initPeer() {
+            peer = new Peer(myWalletId, { debug: 1 });
+
+            peer.on('open', (id) => {
+                document.getElementById('my-id').innerText = id;
+                setStatus('Bağlı', 'bg-green-500');
+            });
+
+            peer.on('error', (err) => {
+                setStatus('Hata!', 'bg-red-500');
+                if (err.type === 'peer-unavailable') alert("NPM Adresi bulunamadı.");
+            });
+
+            peer.on('connection', (conn) => {
+                if (activeConnection && activeConnection.open) { conn.close(); return; }
+                setupConnection(conn);
+            });
+            
+            initDB(); // Veritabanını başlat
+        }
+
+        document.getElementById('connect-btn').addEventListener('click', () => {
+            const targetId = document.getElementById('target-id').value.trim().toUpperCase();
+            if (!targetId || targetId === myWalletId) return;
+            setStatus('Aranıyor...', 'bg-yellow-500');
+            setupConnection(peer.connect(targetId, { reliable: true }));
+        });
+
+        function setupConnection(conn) {
+            activeConnection = conn;
+            conn.on('open', () => {
+                setStatus('Eşleşildi', 'bg-blue-500');
+                document.getElementById('transfer-ui').classList.remove('hidden');
+                document.getElementById('connected-peer-id').innerText = conn.peer;
+            });
+
+            conn.on('data', handleIncomingData);
+
+            conn.on('close', () => {
+                document.getElementById('transfer-ui').classList.add('hidden');
+                setStatus('Bağlı', 'bg-green-500');
+                activeConnection = null;
+            });
+        }
+
+        function handleIncomingData(data) {
+            if (data.type === 'file-header') {
+                incomingFileInfo = data;
+                incomingFileData = [];
+                incomingBytesReceived = 0;
+                addTransferItem(data.id, data.name, data.size, 'Gelen');
+            } 
+            else if (data.type === 'file-chunk') {
+                incomingFileData.push(data.chunk);
+                incomingBytesReceived += data.chunk.byteLength;
+                updateProgress(incomingFileInfo.id, (incomingBytesReceived / incomingFileInfo.size) * 100);
+
+                if (incomingBytesReceived === incomingFileInfo.size) {
+                    const blob = new Blob(incomingFileData, { type: incomingFileInfo.fileType });
+                    
+                    // Geçici belleğe al (Yıldızlamak için)
+                    fileMemoryCache[incomingFileInfo.id] = { name: incomingFileInfo.name, size: incomingFileInfo.size, type: incomingFileInfo.fileType, blob: blob };
+                    
+                    downloadFile(blob, incomingFileInfo.name);
+                    completeTransferItem(incomingFileInfo.id);
+                    incomingFileInfo = null;
+                }
+            }
+        }
+
+        async function sendFile(file) {
+            if (!activeConnection || !activeConnection.open) return alert("Bağlantı koptu!");
+
+            const fileId = 'file_' + Date.now();
+            
+            // Gönderilen dosyayı da geçici belleğe al (Kendi gönderdiğini de kasaya ekleyebilsin diye)
+            fileMemoryCache[fileId] = { name: file.name, size: file.size, type: file.type, blob: file };
+            
+            addTransferItem(fileId, file.name, file.size, 'Giden');
+
+            activeConnection.send({ type: 'file-header', id: fileId, name: file.name, size: file.size, fileType: file.type });
+
+            let offset = 0;
+            const reader = new FileReader();
+
+            const readNextChunk = () => {
+                const slice = file.slice(offset, offset + CHUNK_SIZE);
+                reader.readAsArrayBuffer(slice);
+            };
+
+            reader.onload = (e) => {
+                const chunk = e.target.result;
+                activeConnection.send({ type: 'file-chunk', id: fileId, chunk: chunk });
+                offset += chunk.byteLength;
+                updateProgress(fileId, (offset / file.size) * 100);
+
+                if (offset < file.size) setTimeout(readNextChunk, 5); 
+                else completeTransferItem(fileId);
+            };
+            readNextChunk();
+        }
+
+        // Kasadan başka cihaza dosya gönderme tetikleyicisi
+        function sendFromVault(fileId) {
+            if (!activeConnection) return alert("Önce transfer ekranından bir cihaza bağlanın.");
+            const tx = db.transaction('files', 'readonly');
+            tx.objectStore('files').get(fileId).onsuccess = (e) => {
+                const record = e.target.result;
+                if(record) {
+                    switchTab('transfer');
+                    // Blob'u File nesnesi gibi sarmalayarak gönderim fonksiyonuna paslıyoruz
+                    const fileObj = new File([record.blob], record.name, { type: record.type });
+                    sendFile(fileObj);
+                }
+            };
+        }
+
+        // ==========================================
+        // UI YARDIMCILARI
+        // ==========================================
+        function addTransferItem(id, name, size, type) {
+            const el = document.getElementById('empty-history');
+            if(el) el.remove();
+
+            const icon = type === 'Giden' ? 'ph-arrow-up-right text-npm-red' : 'ph-arrow-down-left text-green-500';
+            const html = `
+                <div id="${id}" class="bg-npm-darker p-3 rounded-lg border border-gray-800 flex flex-col gap-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3 overflow-hidden">
+                            <div class="bg-gray-800 p-1.5 rounded"><i class="ph ${icon} text-lg"></i></div>
+                            <div class="truncate">
+                                <p class="text-sm text-white truncate">${name}</p>
+                                <p class="text-[10px] text-gray-500">${formatBytes(size)}</p>
+                            </div>
+                        </div>
+                        <!-- Yıldızlama Butonu (Başlangıçta gizli veya pasif, transfer bitince aktif olacak) -->
+                        <button id="star-btn-${id}" onclick="openSaveModal('${id}')" class="hidden shrink-0 w-8 h-8 items-center justify-center rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors">
+                            <i class="ph ph-star"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="flex-1 bg-gray-800 rounded-full h-1">
+                            <div class="bg-npm-red h-1 rounded-full w-0 progress-bar transition-all duration-200"></div>
+                        </div>
+                        <span class="text-[10px] font-mono text-gray-400 w-8 text-right progress-text">0%</span>
+                    </div>
+                </div>
+            `;
+            document.getElementById('transfer-list').insertAdjacentHTML('afterbegin', html);
+        }
+
+        function updateProgress(id, percentage) {
+            const el = document.getElementById(id);
+            if (el) {
+                const perc = Math.min(100, Math.round(percentage));
+                el.querySelector('.progress-bar').style.width = `${perc}%`;
+                el.querySelector('.progress-text').innerText = `${perc}%`;
+            }
+        }
+
+        function completeTransferItem(id) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.querySelector('.progress-bar').style.width = `100%`;
+                el.querySelector('.progress-bar').classList.replace('bg-npm-red', 'bg-green-500');
+                el.querySelector('.progress-text').innerText = `100%`;
+                el.querySelector('.progress-text').classList.add('text-green-500');
+                
+                // Transfer bitti, kasaya kaydet (Yıldız) butonunu göster
+                const starBtn = document.getElementById('star-btn-' + id);
+                if(starBtn) starBtn.classList.replace('hidden', 'flex');
+            }
+        }
+
+        function setStatus(text, colorClass) {
+            document.getElementById('status-text').innerText = text;
+            const dot = document.getElementById('status-dot');
+            dot.className = `w-2.5 h-2.5 rounded-full ${colorClass} ${colorClass === 'bg-green-500' ? 'animate-pulse' : ''}`;
+        }
+
+        function copyMyId() {
+            navigator.clipboard.writeText(myWalletId);
+            const el = document.getElementById('my-id');
+            el.classList.add('text-npm-red');
+            setTimeout(() => el.classList.remove('text-npm-red'), 1000);
+        }
+
+        function downloadFile(blob, fileName) {
+            const a = document.createElement('a');
+            const url = window.URL.createObjectURL(blob);
+            a.href = url; a.download = fileName; a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        document.getElementById('disconnect-btn').addEventListener('click', () => {
+            if (activeConnection) activeConnection.close();
+        });
+
+        // Sürükle Bırak / Dosya Seçimi
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('file-input');
+        
+        dropzone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => { for(let f of e.target.files) sendFile(f); fileInput.value = ''; });
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eName => {
+            dropzone.addEventListener(eName, e => { e.preventDefault(); e.stopPropagation(); }, false);
+        });
+        ['dragenter', 'dragover'].forEach(eName => dropzone.addEventListener(eName, () => dropzone.classList.add('drag-active'), false));
+        ['dragleave', 'drop'].forEach(eName => dropzone.addEventListener(eName, () => dropzone.classList.remove('drag-active'), false));
+        dropzone.addEventListener('drop', e => { for(let f of e.dataTransfer.files) sendFile(f); });
+
+        // Uygulamayı Başlat
+        initPeer();
+
+    </script>
+</body>
+</html>
