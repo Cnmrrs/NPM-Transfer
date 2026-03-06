@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NPM Transfer & Kasa</title>
+    <title>NPM Transfer</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <!-- PeerJS (WebRTC P2P Ağ Kütüphanesi) -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- JSZip (Toplu Zip indirme için) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -64,15 +66,25 @@
                 <!-- My Wallet Box -->
                 <div class="glass-panel rounded-xl p-5 relative overflow-hidden group">
                     <div class="absolute top-0 right-0 w-24 h-24 bg-npm-red opacity-10 rounded-bl-full transform translate-x-8 -translate-y-8"></div>
-                    <h2 class="text-xs text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                        <i class="ph ph-identification-card text-npm-red"></i> Sizin NPM Adresiniz
-                    </h2>
+                    <div class="flex items-center justify-between mb-2">
+                        <h2 class="text-xs text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                            <i class="ph ph-identification-card text-npm-red"></i> Sizin NPM Adresiniz
+                        </h2>
+                    </div>
+                    
                     <div class="bg-npm-darker p-3 rounded-lg border border-gray-800 flex items-center justify-between">
                         <span id="my-id" class="font-mono text-lg text-white font-bold">...</span>
-                        <button onclick="copyMyId()" class="p-2 bg-gray-800 hover:bg-gray-700 rounded transition-colors text-white">
-                            <i class="ph ph-copy text-lg"></i>
-                        </button>
+                        <div class="flex gap-1 shrink-0">
+                            <button onclick="copyMyId()" id="copy-id-btn" class="p-2 bg-gray-800 hover:bg-gray-700 rounded transition-colors text-white" title="Adresi Kopyala">
+                                <i class="ph ph-copy text-lg"></i>
+                            </button>
+                            <!-- Yeni: Paylaşım Linki Kopyalama Butonu -->
+                            <button onclick="copyShareLink()" id="share-link-btn" class="p-2 bg-blue-900/40 border border-blue-800 hover:bg-blue-800 rounded transition-colors text-blue-400 hover:text-white" title="Davet Linkini Kopyala">
+                                <i class="ph ph-link-simple text-lg"></i>
+                            </button>
+                        </div>
                     </div>
+                    <p class="text-[10px] text-gray-500 mt-2 italic">Karşı tarafın direkt bağlanması için davet linkini gönderebilirsiniz.</p>
                 </div>
 
                 <!-- Connect Box -->
@@ -91,19 +103,21 @@
             </div>
 
             <!-- Transfer UI (Appears when connected) -->
-            <div id="transfer-ui" class="glass-panel rounded-xl flex flex-col hidden overflow-hidden border border-gray-700 mt-4">
+            <div id="transfer-ui" class="glass-panel rounded-xl flex flex-col hidden overflow-hidden border border-npm-red/30 shadow-[0_0_15px_rgba(203,56,55,0.1)] mt-4">
                 <div class="bg-npm-dark p-3 border-b border-gray-800 flex justify-between items-center">
                     <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-full bg-green-900/30 text-green-500 flex items-center justify-center border border-green-800">
+                        <div class="w-8 h-8 rounded-full bg-green-900/30 text-green-500 flex items-center justify-center border border-green-800 relative">
                             <i class="ph ph-user-circle-gear text-xl"></i>
+                            <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border border-npm-dark"></span>
                         </div>
                         <div>
                             <p class="text-[10px] text-gray-400 leading-none">Bağlı Cihaz</p>
                             <p id="connected-peer-id" class="font-mono text-sm text-white font-bold"></p>
                         </div>
                     </div>
-                    <button id="disconnect-btn" class="text-gray-400 hover:text-red-500 bg-gray-800 hover:bg-gray-700 p-2 rounded-md transition-colors">
-                        <i class="ph ph-x-circle text-lg"></i>
+                    <!-- Geliştirilmiş Bağlantı Kesme Butonu -->
+                    <button id="disconnect-btn" class="flex items-center gap-1.5 text-xs font-bold text-red-400 hover:text-white bg-red-900/20 border border-red-900/50 hover:bg-red-600 px-3 py-1.5 rounded-md transition-colors">
+                        <i class="ph ph-power"></i> Bağlantıyı Kes
                     </button>
                 </div>
 
@@ -128,16 +142,21 @@
 
         <!-- ==================== TAB 2: KASA (YILDIZLILAR) ==================== -->
         <div id="view-vault" class="p-4 max-w-5xl mx-auto space-y-4 hidden animate-fade-in">
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex items-start justify-between mb-4">
                 <div>
                     <h2 class="text-xl font-bold text-white flex items-center gap-2">
                         <i class="ph-fill ph-star text-yellow-500"></i> Dosya Kasası
                     </h2>
                     <p class="text-xs text-gray-500">Cihazına kaydedilen özel dosyaların</p>
                 </div>
-                <!-- Toplam Boyut Göstergesi -->
-                <div class="bg-gray-800 px-3 py-1 rounded-full text-xs font-mono text-gray-300 border border-gray-700">
-                    <span id="vault-total-size">0 MB</span>
+                <!-- Toplam Boyut Göstergesi & ZIP Export -->
+                <div class="flex flex-col items-end gap-2">
+                    <div class="bg-gray-800 px-3 py-1 rounded-full text-xs font-mono text-gray-300 border border-gray-700">
+                        <span id="vault-total-size">0 MB</span>
+                    </div>
+                    <button id="zip-export-btn" onclick="exportVaultAsZip()" class="text-[10px] font-bold uppercase tracking-wider bg-blue-900/30 border border-blue-800 hover:bg-blue-700 text-blue-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                        <i class="ph ph-file-zip text-base"></i> Tümünü ZIP İndir
+                    </button>
                 </div>
             </div>
 
@@ -191,7 +210,7 @@
         // ==========================================
         const DB_NAME = 'NPMVaultDB';
         let db;
-        // Transfer sırasında bellekte tutulan dosyalar (kaydetmek için referans)
+        // Transfer sırasında bellekte tutulan dosyalar (Manuel indirme ve kasaya kaydetmek için referans)
         const fileMemoryCache = {}; 
         let fileToSaveId = null;
 
@@ -200,7 +219,6 @@
             
             request.onupgradeneeded = (e) => {
                 db = e.target.result;
-                // Dosyalar tablosu
                 if (!db.objectStoreNames.contains('files')) {
                     const store = db.createObjectStore('files', { keyPath: 'id' });
                     store.createIndex('category', 'category', { unique: false });
@@ -209,7 +227,7 @@
 
             request.onsuccess = (e) => {
                 db = e.target.result;
-                loadVaultData(); // Açılışta kasayı yükle
+                loadVaultData(); 
             };
             
             request.onerror = (e) => console.error("DB Hatası:", e);
@@ -234,14 +252,13 @@
             store.put(record);
 
             tx.oncomplete = () => {
-                // UI Güncelle
                 const btn = document.getElementById('star-btn-' + fileId);
                 if(btn) {
                     btn.innerHTML = '<i class="ph-fill ph-star text-yellow-500"></i>';
                     btn.classList.add('pointer-events-none');
                 }
                 closeSaveModal();
-                loadVaultData(); // Kasayı yenile
+                loadVaultData(); 
             };
         }
 
@@ -253,7 +270,7 @@
         }
 
         // ==========================================
-        // 2. KASA UI OLUŞTURMA (KATEGORİLER)
+        // 2. KASA UI VE ZIP EXPORT
         // ==========================================
         function loadVaultData() {
             if (!db) return;
@@ -275,7 +292,6 @@
             let totalBytes = 0;
             const categories = {};
 
-            // Dosyaları kategorilere ayır
             files.forEach(f => {
                 totalBytes += f.size;
                 if(!categories[f.category]) categories[f.category] = [];
@@ -283,17 +299,19 @@
             });
 
             document.getElementById('vault-total-size').innerText = formatBytes(totalBytes);
+            const zipBtn = document.getElementById('zip-export-btn');
 
             if(Object.keys(categories).length === 0) {
                 container.innerHTML = `<div class="text-center p-8 border border-gray-800 border-dashed rounded-xl bg-npm-darker"><i class="ph ph-folder-open text-4xl text-gray-600 mb-2"></i><p class="text-gray-500 text-sm">Kasada hiç dosya yok.</p></div>`;
+                zipBtn.classList.add('hidden'); // Kasa boşsa ZIP butonunu gizle
                 return;
             }
 
-            // Kategorileri UI'a bas
+            zipBtn.classList.remove('hidden');
+
             for (const [catName, catFiles] of Object.entries(categories)) {
-                // Kategori Başlığı
                 const catHtml = `
-                    <div class="bg-npm-darker border border-gray-800 rounded-xl overflow-hidden">
+                    <div class="bg-npm-darker border border-gray-800 rounded-xl overflow-hidden shadow-sm">
                         <div class="bg-gray-800/50 p-3 flex items-center justify-between border-b border-gray-800">
                             <h3 class="font-medium text-white text-sm flex items-center gap-2">
                                 <i class="ph-fill ph-folder text-npm-red"></i> ${catName}
@@ -311,7 +329,7 @@
 
         function createVaultItemHtml(file) {
             return `
-                <div class="p-3 flex items-center justify-between hover:bg-gray-800/30 transition-colors">
+                <div class="p-3 flex items-center justify-between hover:bg-gray-800/30 transition-colors group">
                     <div class="flex items-center gap-3 overflow-hidden">
                         <i class="ph ph-file text-xl text-gray-400 shrink-0"></i>
                         <div class="truncate">
@@ -319,10 +337,10 @@
                             <p class="text-[10px] text-gray-500">${formatBytes(file.size)} • ${new Date(file.timestamp).toLocaleDateString()}</p>
                         </div>
                     </div>
-                    <div class="flex gap-2 shrink-0">
+                    <div class="flex gap-2 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
                         ${activeConnection ? `<button onclick="sendFromVault('${file.id}')" class="w-8 h-8 rounded bg-npm-dark hover:bg-npm-red flex items-center justify-center transition-colors text-white" title="Bağlı Cihaza Gönder"><i class="ph ph-paper-plane-tilt"></i></button>` : ''}
-                        <button onclick="downloadFromVault('${file.id}')" class="w-8 h-8 rounded bg-npm-dark hover:bg-gray-700 flex items-center justify-center transition-colors text-white" title="Cihaza İndir"><i class="ph ph-download-simple"></i></button>
-                        <button onclick="deleteFromVault('${file.id}')" class="w-8 h-8 rounded bg-npm-dark hover:bg-red-900/50 flex items-center justify-center transition-colors text-red-400" title="Sil"><i class="ph ph-trash"></i></button>
+                        <button onclick="downloadFromVault('${file.id}')" class="w-8 h-8 rounded bg-blue-900/30 hover:bg-blue-600 border border-blue-900 flex items-center justify-center transition-colors text-blue-400 hover:text-white" title="Cihaza İndir"><i class="ph ph-download-simple"></i></button>
+                        <button onclick="deleteFromVault('${file.id}')" class="w-8 h-8 rounded bg-npm-dark hover:bg-red-900/80 flex items-center justify-center transition-colors text-red-400 hover:text-white" title="Sil"><i class="ph ph-trash"></i></button>
                     </div>
                 </div>
             `;
@@ -342,6 +360,42 @@
             };
         }
 
+        // --- YENİ: Toplu ZIP Export Özelliği ---
+        async function exportVaultAsZip() {
+            if (!db) return alert("Veritabanı hazır değil.");
+            const tx = db.transaction('files', 'readonly');
+            const store = tx.objectStore('files');
+            const request = store.getAll();
+
+            request.onsuccess = async () => {
+                const files = request.result;
+                if (files.length === 0) return alert("Kasada dosya yok!");
+
+                const zipBtn = document.getElementById('zip-export-btn');
+                const originalContent = zipBtn.innerHTML;
+                zipBtn.innerHTML = '<i class="ph ph-spinner animate-spin text-lg"></i> Hazırlanıyor...';
+                zipBtn.classList.add('pointer-events-none', 'opacity-50');
+
+                const zip = new JSZip();
+                
+                // Kategorilere göre klasör oluşturup dosyaları ekle
+                files.forEach(f => {
+                    zip.folder(f.category).file(f.name, f.blob);
+                });
+
+                try {
+                    const content = await zip.generateAsync({ type: "blob" });
+                    downloadFile(content, "NPM_Kasa_Yedegi.zip");
+                } catch (error) {
+                    console.error("ZIP oluşturma hatası:", error);
+                    alert("ZIP oluşturulurken bir hata meydana geldi.");
+                } finally {
+                    zipBtn.innerHTML = originalContent;
+                    zipBtn.classList.remove('pointer-events-none', 'opacity-50');
+                }
+            };
+        }
+
         // ==========================================
         // 3. UI TAB VE MODAL KONTROLLERİ
         // ==========================================
@@ -358,7 +412,6 @@
             document.getElementById(`nav-${tabId}`).classList.remove('text-gray-500');
             document.getElementById(`nav-${tabId}`).classList.add('tab-active');
 
-            // Kasaya geçerken UI'ı yenile ki güncel bağlantı durumuna göre "Gönder" butonları gelsin
             if(tabId === 'vault') loadVaultData();
         }
 
@@ -405,12 +458,22 @@
 
             peer.on('open', (id) => {
                 document.getElementById('my-id').innerText = id;
-                setStatus('Bağlı', 'bg-green-500');
+                setStatus('Ağa Bağlı', 'bg-green-500');
+
+                // YENİ: Otomatik Bağlantı Linki Kontrolü
+                const urlParams = new URLSearchParams(window.location.search);
+                const connectId = urlParams.get('connect');
+                if (connectId && connectId !== myWalletId) {
+                    document.getElementById('target-id').value = connectId;
+                    setTimeout(() => document.getElementById('connect-btn').click(), 500); // UI yüklensin diye ufak gecikme
+                    // URL'yi temizle (sayfa yenilenince tekrar bağlanmasın)
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
             });
 
             peer.on('error', (err) => {
                 setStatus('Hata!', 'bg-red-500');
-                if (err.type === 'peer-unavailable') alert("NPM Adresi bulunamadı.");
+                if (err.type === 'peer-unavailable') alert("NPM Adresi bulunamadı veya çevrimdışı.");
             });
 
             peer.on('connection', (conn) => {
@@ -418,7 +481,7 @@
                 setupConnection(conn);
             });
             
-            initDB(); // Veritabanını başlat
+            initDB(); 
         }
 
         document.getElementById('connect-btn').addEventListener('click', () => {
@@ -426,6 +489,23 @@
             if (!targetId || targetId === myWalletId) return;
             setStatus('Aranıyor...', 'bg-yellow-500');
             setupConnection(peer.connect(targetId, { reliable: true }));
+        });
+
+        // YENİ: Bağlantı Kesme (Disconnect) İşlemi
+        function disconnectPeer() {
+            if (activeConnection) {
+                activeConnection.close();
+                activeConnection = null;
+            }
+            document.getElementById('transfer-ui').classList.add('hidden');
+            setStatus('Ağa Bağlı', 'bg-green-500');
+            document.getElementById('target-id').value = '';
+        }
+
+        document.getElementById('disconnect-btn').addEventListener('click', () => {
+            if(confirm("Bağlantıyı kesmek istediğinize emin misiniz? Devam eden aktarımlar iptal olur.")) {
+                disconnectPeer();
+            }
         });
 
         function setupConnection(conn) {
@@ -439,9 +519,7 @@
             conn.on('data', handleIncomingData);
 
             conn.on('close', () => {
-                document.getElementById('transfer-ui').classList.add('hidden');
-                setStatus('Bağlı', 'bg-green-500');
-                activeConnection = null;
+                disconnectPeer(); // Bağlantı koptuğunda UI'ı temizle
             });
         }
 
@@ -460,10 +538,9 @@
                 if (incomingBytesReceived === incomingFileInfo.size) {
                     const blob = new Blob(incomingFileData, { type: incomingFileInfo.fileType });
                     
-                    // Geçici belleğe al (Yıldızlamak için)
+                    // Geçici belleğe al. (Eskiden burada direkt downloadFile() çağrılıyordu, artık çağrılmıyor)
                     fileMemoryCache[incomingFileInfo.id] = { name: incomingFileInfo.name, size: incomingFileInfo.size, type: incomingFileInfo.fileType, blob: blob };
                     
-                    downloadFile(blob, incomingFileInfo.name);
                     completeTransferItem(incomingFileInfo.id);
                     incomingFileInfo = null;
                 }
@@ -471,11 +548,11 @@
         }
 
         async function sendFile(file) {
-            if (!activeConnection || !activeConnection.open) return alert("Bağlantı koptu!");
+            if (!activeConnection || !activeConnection.open) return alert("Önce bir bağlantı kurmalısınız.");
 
             const fileId = 'file_' + Date.now();
             
-            // Gönderilen dosyayı da geçici belleğe al (Kendi gönderdiğini de kasaya ekleyebilsin diye)
+            // Gönderileni de belleğe alalım ki o da yıldızlanabilsin
             fileMemoryCache[fileId] = { name: file.name, size: file.size, type: file.type, blob: file };
             
             addTransferItem(fileId, file.name, file.size, 'Giden');
@@ -502,7 +579,6 @@
             readNextChunk();
         }
 
-        // Kasadan başka cihaza dosya gönderme tetikleyicisi
         function sendFromVault(fileId) {
             if (!activeConnection) return alert("Önce transfer ekranından bir cihaza bağlanın.");
             const tx = db.transaction('files', 'readonly');
@@ -510,7 +586,6 @@
                 const record = e.target.result;
                 if(record) {
                     switchTab('transfer');
-                    // Blob'u File nesnesi gibi sarmalayarak gönderim fonksiyonuna paslıyoruz
                     const fileObj = new File([record.blob], record.name, { type: record.type });
                     sendFile(fileObj);
                 }
@@ -518,7 +593,7 @@
         }
 
         // ==========================================
-        // UI YARDIMCILARI
+        // UI YARDIMCILARI (Geliştirilmiş Manuel İndirme Butonu ile)
         // ==========================================
         function addTransferItem(id, name, size, type) {
             const el = document.getElementById('empty-history');
@@ -526,19 +601,25 @@
 
             const icon = type === 'Giden' ? 'ph-arrow-up-right text-npm-red' : 'ph-arrow-down-left text-green-500';
             const html = `
-                <div id="${id}" class="bg-npm-darker p-3 rounded-lg border border-gray-800 flex flex-col gap-2">
+                <div id="${id}" class="bg-npm-darker p-3 rounded-lg border border-gray-800 flex flex-col gap-2 transition-all">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3 overflow-hidden">
                             <div class="bg-gray-800 p-1.5 rounded"><i class="ph ${icon} text-lg"></i></div>
                             <div class="truncate">
-                                <p class="text-sm text-white truncate">${name}</p>
+                                <p class="text-sm text-white truncate font-medium">${name}</p>
                                 <p class="text-[10px] text-gray-500">${formatBytes(size)}</p>
                             </div>
                         </div>
-                        <!-- Yıldızlama Butonu (Başlangıçta gizli veya pasif, transfer bitince aktif olacak) -->
-                        <button id="star-btn-${id}" onclick="openSaveModal('${id}')" class="hidden shrink-0 w-8 h-8 items-center justify-center rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors">
-                            <i class="ph ph-star"></i>
-                        </button>
+                        <div class="flex gap-1">
+                            <!-- YENİ: Manuel İndirme Butonu (Aktarım bitince aktif olur) -->
+                            <button id="download-btn-${id}" onclick="downloadFromMemory('${id}')" class="hidden shrink-0 w-8 h-8 items-center justify-center rounded-full bg-blue-900/30 hover:bg-blue-600 border border-blue-900 text-blue-400 hover:text-white transition-colors" title="Cihaza İndir">
+                                <i class="ph ph-download-simple"></i>
+                            </button>
+                            <!-- Yıldızlama Butonu -->
+                            <button id="star-btn-${id}" onclick="openSaveModal('${id}')" class="hidden shrink-0 w-8 h-8 items-center justify-center rounded-full bg-gray-800 hover:bg-yellow-900/50 hover:text-yellow-500 text-gray-400 transition-colors" title="Kasaya Kaydet">
+                                <i class="ph ph-star"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="flex items-center gap-2">
                         <div class="flex-1 bg-gray-800 rounded-full h-1">
@@ -568,9 +649,21 @@
                 el.querySelector('.progress-text').innerText = `100%`;
                 el.querySelector('.progress-text').classList.add('text-green-500');
                 
-                // Transfer bitti, kasaya kaydet (Yıldız) butonunu göster
                 const starBtn = document.getElementById('star-btn-' + id);
                 if(starBtn) starBtn.classList.replace('hidden', 'flex');
+
+                const dlBtn = document.getElementById('download-btn-' + id);
+                if(dlBtn) dlBtn.classList.replace('hidden', 'flex');
+            }
+        }
+
+        // YENİ: Transfer geçmişindeki butondan manuel indirme fonksiyonu
+        function downloadFromMemory(id) {
+            const fileData = fileMemoryCache[id];
+            if (fileData) {
+                downloadFile(fileData.blob, fileData.name);
+            } else {
+                alert("Dosya bellekte bulunamadı. Sayfayı yenilediyseniz kaybolmuş olabilir.");
             }
         }
 
@@ -582,9 +675,21 @@
 
         function copyMyId() {
             navigator.clipboard.writeText(myWalletId);
-            const el = document.getElementById('my-id');
-            el.classList.add('text-npm-red');
-            setTimeout(() => el.classList.remove('text-npm-red'), 1000);
+            const btn = document.getElementById('copy-id-btn');
+            btn.innerHTML = '<i class="ph ph-check text-green-500 text-lg"></i>';
+            setTimeout(() => btn.innerHTML = '<i class="ph ph-copy text-lg"></i>', 1500);
+        }
+
+        // YENİ: Paylaşım Linki Oluşturma ve Kopyalama
+        function copyShareLink() {
+            // URL içindeki query parametrelerini temizleyerek ana linki alırız
+            const baseUrl = window.location.href.split('?')[0]; 
+            const shareUrl = `${baseUrl}?connect=${myWalletId}`;
+            
+            navigator.clipboard.writeText(shareUrl);
+            const btn = document.getElementById('share-link-btn');
+            btn.innerHTML = '<i class="ph ph-check text-green-500 text-lg"></i>';
+            setTimeout(() => btn.innerHTML = '<i class="ph ph-link-simple text-lg"></i>', 1500);
         }
 
         function downloadFile(blob, fileName) {
@@ -600,10 +705,6 @@
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
         }
-
-        document.getElementById('disconnect-btn').addEventListener('click', () => {
-            if (activeConnection) activeConnection.close();
-        });
 
         // Sürükle Bırak / Dosya Seçimi
         const dropzone = document.getElementById('dropzone');
