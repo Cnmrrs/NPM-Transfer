@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NPM Transfer & Kasa</title>
+    <title>NPM Transfer</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -78,12 +78,12 @@
                             <button onclick="copyMyId()" id="copy-id-btn" class="p-2 bg-gray-800 hover:bg-gray-700 rounded transition-colors text-white" title="Adresi Kopyala">
                                 <i class="ph ph-copy text-lg"></i>
                             </button>
-                            <button onclick="copyShareLink()" id="share-link-btn" class="p-2 bg-blue-900/40 border border-blue-800 hover:bg-blue-800 rounded transition-colors text-blue-400 hover:text-white" title="Davet Linkini Kopyala">
+                            <button onclick="copyShareLink()" id="share-link-btn" class="p-2 bg-blue-900/40 border border-blue-800 hover:bg-blue-800 rounded transition-colors text-blue-400 hover:text-white" title="Profilinize Davet Linkini Kopyala">
                                 <i class="ph ph-link-simple text-lg"></i>
                             </button>
                         </div>
                     </div>
-                    <p class="text-[10px] text-gray-500 mt-2 italic">Karşı tarafın direkt bağlanması için davet linkini gönderebilirsiniz.</p>
+                    <p class="text-[10px] text-gray-500 mt-2 italic">Arkadaşlarınızın size direkt bağlanması için davet linkinizi gönderebilirsiniz.</p>
                 </div>
 
                 <!-- Connect Box -->
@@ -95,7 +95,6 @@
                         <!-- Sabit NPM- Prefix'li Input Alanı -->
                         <div class="flex-1 bg-npm-darker border border-gray-700 rounded-lg flex items-center focus-within:border-npm-red transition-colors px-3 py-3 overflow-hidden cursor-text" onclick="document.getElementById('target-id').focus()">
                             <span class="text-gray-500 font-mono text-sm select-none font-bold">NPM-</span>
-                            <!-- maxlength 10 yapıldı ki NPM-XXXXX kopyalayıp yapıştırılırsa kırpılmasın -->
                             <input type="text" id="target-id" placeholder="XXXXX" maxlength="10"
                                 class="bg-transparent text-white font-mono focus:outline-none uppercase w-full text-sm ml-1 placeholder-gray-600">
                         </div>
@@ -262,12 +261,8 @@
         // ==========================================
         // UI: NPM Uygulamaları Modalı Kontrolü
         // ==========================================
-        function openAppsModal() {
-            document.getElementById('apps-modal').classList.remove('hidden');
-        }
-        function closeAppsModal() {
-            document.getElementById('apps-modal').classList.add('hidden');
-        }
+        function openAppsModal() { document.getElementById('apps-modal').classList.remove('hidden'); }
+        function closeAppsModal() { document.getElementById('apps-modal').classList.add('hidden'); }
 
         // ==========================================
         // NATIVE SHARE (BLUETOOTH / AIRDROP vb.) ENTEGRASYONU
@@ -275,21 +270,12 @@
         async function invokeNativeShare(blob, fileName) {
             try {
                 const file = new File([blob], fileName, { type: blob.type });
-                
-                // Cihazın paylaşım API'sini destekleyip desteklemediğini kontrol et
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    await navigator.share({
-                        files: [file],
-                        title: fileName,
-                        text: 'NPM Vault üzerinden paylaşıldı'
-                    });
+                    await navigator.share({ files: [file], title: fileName, text: 'NPM Vault üzerinden paylaşıldı' });
                 } else {
                     alert("Cihazınız bu dosya türü için yerel paylaşımı (Bluetooth vb.) doğrudan desteklemiyor. Lütfen önce cihazınıza indirip oradan paylaşın.");
                 }
-            } catch (error) {
-                // Kullanıcı menüyü kendi kapatırsa hata basmamak için logluyoruz
-                console.log('Paylaşım iptal edildi veya başarısız oldu.', error);
-            }
+            } catch (error) { console.log('Paylaşım iptal edildi veya başarısız oldu.', error); }
         }
 
         // ==========================================
@@ -302,7 +288,6 @@
 
         function initDB() {
             const request = indexedDB.open(DB_NAME, 1);
-            
             request.onupgradeneeded = (e) => {
                 db = e.target.result;
                 if (!db.objectStoreNames.contains('files')) {
@@ -310,12 +295,10 @@
                     store.createIndex('category', 'category', { unique: false });
                 }
             };
-
             request.onsuccess = (e) => {
                 db = e.target.result;
                 loadVaultData(); 
             };
-            
             request.onerror = (e) => console.error("DB Hatası:", e);
         }
 
@@ -324,25 +307,16 @@
             if (!fileData || !db) return;
 
             const record = {
-                id: fileId,
-                name: fileData.name,
-                blob: fileData.blob,
-                size: fileData.size,
-                type: fileData.type,
-                category: categoryName || 'Genel',
-                timestamp: Date.now()
+                id: fileId, name: fileData.name, blob: fileData.blob,
+                size: fileData.size, type: fileData.type,
+                category: categoryName || 'Genel', timestamp: Date.now()
             };
 
             const tx = db.transaction('files', 'readwrite');
-            const store = tx.objectStore('files');
-            store.put(record);
-
+            tx.objectStore('files').put(record);
             tx.oncomplete = () => {
                 const btn = document.getElementById('star-btn-' + fileId);
-                if(btn) {
-                    btn.innerHTML = '<i class="ph-fill ph-star text-yellow-500"></i>';
-                    btn.classList.add('pointer-events-none');
-                }
+                if(btn) { btn.innerHTML = '<i class="ph-fill ph-star text-yellow-500"></i>'; btn.classList.add('pointer-events-none'); }
                 closeSaveModal();
                 loadVaultData(); 
             };
@@ -361,11 +335,8 @@
         function loadVaultData() {
             if (!db) return;
             const tx = db.transaction('files', 'readonly');
-            const store = tx.objectStore('files');
-            const request = store.getAll();
-
-            request.onsuccess = () => {
-                const files = request.result;
+            tx.objectStore('files').getAll().onsuccess = (e) => {
+                const files = e.target.result;
                 renderVaultUI(files);
                 updateCategoryDatalist(files);
             };
@@ -424,11 +395,11 @@
                         </div>
                     </div>
                     <div class="flex gap-2 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
-                        ${activeConnection ? `<button onclick="sendFromVault('${file.id}')" class="w-8 h-8 rounded bg-npm-dark hover:bg-npm-red flex items-center justify-center transition-colors text-white" title="Bağlı Cihaza Gönder"><i class="ph ph-paper-plane-tilt"></i></button>` : ''}
-                        
-                        <!-- YENİ: Native Share Butonu (Kasa için) -->
-                        <button onclick="shareFromVault('${file.id}')" class="w-8 h-8 rounded bg-purple-900/30 hover:bg-purple-600 border border-purple-900 flex items-center justify-center transition-colors text-purple-400 hover:text-white" title="Cihaz Menüsüyle Paylaş (Bluetooth/AirDrop vb.)"><i class="ph ph-share-network"></i></button>
+                        <!-- YENİ: MediaFire Tarzı Link Host Etme Butonu -->
+                        <button onclick="copyHostLink('${file.id}')" class="w-8 h-8 rounded bg-teal-900/30 hover:bg-teal-600 border border-teal-900 flex items-center justify-center transition-colors text-teal-400 hover:text-white" title="İndirme Linki Oluştur (Siz açıkken başkası indirebilir)"><i class="ph ph-cloud-arrow-up"></i></button>
 
+                        <button onclick="sendFromVault('${file.id}')" class="w-8 h-8 rounded bg-npm-dark hover:bg-npm-red flex items-center justify-center transition-colors text-white" title="Aktif Cihaza Gönder"><i class="ph ph-paper-plane-tilt"></i></button>
+                        <button onclick="shareFromVault('${file.id}')" class="w-8 h-8 rounded bg-purple-900/30 hover:bg-purple-600 border border-purple-900 flex items-center justify-center transition-colors text-purple-400 hover:text-white" title="Cihaz Menüsüyle Paylaş"><i class="ph ph-share-network"></i></button>
                         <button onclick="downloadFromVault('${file.id}')" class="w-8 h-8 rounded bg-blue-900/30 hover:bg-blue-600 border border-blue-900 flex items-center justify-center transition-colors text-blue-400 hover:text-white" title="Cihaza İndir"><i class="ph ph-download-simple"></i></button>
                         <button onclick="deleteFromVault('${file.id}')" class="w-8 h-8 rounded bg-npm-dark hover:bg-red-900/80 flex items-center justify-center transition-colors text-red-400 hover:text-white" title="Sil"><i class="ph ph-trash"></i></button>
                     </div>
@@ -445,28 +416,22 @@
         function downloadFromVault(id) {
             const tx = db.transaction('files', 'readonly');
             tx.objectStore('files').get(id).onsuccess = (e) => {
-                const record = e.target.result;
-                if(record) downloadFile(record.blob, record.name);
+                if(e.target.result) downloadFile(e.target.result.blob, e.target.result.name);
             };
         }
 
-        // Kasadan Paylaşma Tetikleyicisi
         function shareFromVault(id) {
             const tx = db.transaction('files', 'readonly');
             tx.objectStore('files').get(id).onsuccess = (e) => {
-                const record = e.target.result;
-                if(record) invokeNativeShare(record.blob, record.name);
+                if(e.target.result) invokeNativeShare(e.target.result.blob, e.target.result.name);
             };
         }
 
         async function exportVaultAsZip() {
             if (!db) return alert("Veritabanı hazır değil.");
             const tx = db.transaction('files', 'readonly');
-            const store = tx.objectStore('files');
-            const request = store.getAll();
-
-            request.onsuccess = async () => {
-                const files = request.result;
+            tx.objectStore('files').getAll().onsuccess = async (e) => {
+                const files = e.target.result;
                 if (files.length === 0) return alert("Kasada dosya yok!");
 
                 const zipBtn = document.getElementById('zip-export-btn');
@@ -475,17 +440,14 @@
                 zipBtn.classList.add('pointer-events-none', 'opacity-50');
 
                 const zip = new JSZip();
-                
-                files.forEach(f => {
-                    zip.folder(f.category).file(f.name, f.blob);
-                });
+                files.forEach(f => zip.folder(f.category).file(f.name, f.blob));
 
                 try {
                     const content = await zip.generateAsync({ type: "blob" });
                     downloadFile(content, "NPM_Kasa_Yedegi.zip");
                 } catch (error) {
                     console.error("ZIP oluşturma hatası:", error);
-                    alert("ZIP oluşturulurken bir hata meydana geldi.");
+                    alert("ZIP oluşturulurken hata meydana geldi.");
                 } finally {
                     zipBtn.innerHTML = originalContent;
                     zipBtn.classList.remove('pointer-events-none', 'opacity-50');
@@ -531,8 +493,16 @@
             saveFileToVault(fileToSaveId, cat);
         });
 
+        // YENİ: Host (MediaFire) Link Kopyalama
+        function copyHostLink(fileId) {
+            const baseUrl = window.location.href.split('?')[0]; 
+            const shareUrl = `${baseUrl}?host=${myWalletId}&f=${fileId}`;
+            navigator.clipboard.writeText(shareUrl);
+            alert("☁️ İndirme Linki Kopyalandı!\n\nBu linki arkadaşlarınıza gönderin. Tarayıcınız açık kaldığı sürece bu dosyayı doğrudan cihazınızdan indirebilecekler.");
+        }
+
         // ==========================================
-        // 4. WEBRTC MANTIĞI VE TRANSFER
+        // 4. WEBRTC MANTIĞI VE TRANSFER (YENİDEN DÜZENLENDİ)
         // ==========================================
         const generateWalletId = () => {
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -546,10 +516,6 @@
 
         let peer = null;
         let activeConnection = null;
-        let connectionTimeout = null; 
-
-        let reconnectAttempts = 0;
-        const MAX_RECONNECT = 5;
 
         const CHUNK_SIZE = 256 * 1024;
         let incomingFileInfo = null;
@@ -557,25 +523,28 @@
         let incomingBytesReceived = 0;
 
         function initPeer() {
-            peer = new Peer(myWalletId, { 
-                debug: 0,
-                config: {
-                    'iceServers': [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' },
-                        { urls: 'stun:stun2.l.google.com:19302' }
-                    ]
-                }
-            });
+            // BAĞLANTI FIX: Eski, sorunsuz varsayılan ayarlara dönüldü (Özel ICE serverlar kaldırıldı)
+            peer = new Peer(myWalletId, { debug: 0 });
 
             peer.on('open', (id) => {
-                reconnectAttempts = 0; 
                 document.getElementById('my-id').innerText = id; 
                 setStatus('Ağa Bağlı', 'bg-green-500');
 
+                // YENİ: URL Kontrolü (Acaba bir MediaFire linkinden mi geldik?)
                 const urlParams = new URLSearchParams(window.location.search);
+                const hostId = urlParams.get('host');
+                const fileId = urlParams.get('f');
                 const connectId = urlParams.get('connect');
-                if (connectId && connectId !== myWalletId) {
+
+                if (hostId && fileId && hostId !== myWalletId) {
+                    // Host'a otomatik bağlan ve dosyayı iste
+                    setStatus('Dosya Sunucusuna Bağlanıyor...', 'bg-yellow-500');
+                    const conn = peer.connect(hostId, { reliable: true });
+                    setupConnection(conn, true, fileId); // isDownloader = true
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                } 
+                else if (connectId && connectId !== myWalletId) {
+                    // Normal profil linkinden gelindiyse
                     document.getElementById('target-id').value = connectId.replace('NPM-', '');
                     setTimeout(() => document.getElementById('connect-btn').click(), 500);
                     window.history.replaceState({}, document.title, window.location.pathname);
@@ -584,35 +553,23 @@
 
             peer.on('error', (err) => {
                 if (err.type === 'peer-unavailable') {
-                    if (connectionTimeout) clearTimeout(connectionTimeout);
                     setStatus('Hata!', 'bg-red-500');
-                    alert("Girdiğiniz NPM Adresi bulunamadı veya şu an aktif değil.");
+                    alert("Girdiğiniz adres veya bağlandığınız sunucu çevrimdışı.");
                 } else if (err.type === 'network' || err.type === 'server-error' || err.type === 'unavailable-id') {
                     setStatus('Sunucu Hatası', 'bg-red-500');
-                } else {
-                    console.error("PeerJS Hatası:", err);
                 }
             });
 
             peer.on('disconnected', () => {
-                if (peer.destroyed) return;
-
-                if (reconnectAttempts < MAX_RECONNECT) {
-                    reconnectAttempts++;
-                    setStatus(`Yeniden Bağlanıyor (${reconnectAttempts}/${MAX_RECONNECT})...`, 'bg-yellow-500');
-                    
-                    setTimeout(() => {
-                        if (!peer.destroyed && peer.disconnected) {
-                            peer.reconnect();
-                        }
-                    }, 3000 * reconnectAttempts); 
-                } else {
-                    setStatus('Bağlantı Koptu', 'bg-red-500');
+                if (!peer.destroyed) {
+                    setStatus('Yeniden Bağlanıyor...', 'bg-yellow-500');
+                    setTimeout(() => { if (!peer.destroyed && peer.disconnected) peer.reconnect(); }, 2000); 
                 }
             });
 
+            // YENİ: Biri bize bağlandığında
             peer.on('connection', (conn) => {
-                if (activeConnection && activeConnection.open) { conn.close(); return; }
+                // Eskiden başka biri bağlıysa reddediyorduk, artık MediaFire özelliği için herkes bağlanabilir.
                 setupConnection(conn);
             });
             
@@ -621,29 +578,16 @@
 
         document.getElementById('connect-btn').addEventListener('click', () => {
             let inputVal = document.getElementById('target-id').value.trim().toUpperCase();
-            
-            if (inputVal.startsWith('NPM-')) {
-                inputVal = inputVal.substring(4);
-            }
+            if (inputVal.startsWith('NPM-')) inputVal = inputVal.substring(4);
             if (!inputVal) return;
             
             const targetId = 'NPM-' + inputVal;
             if (targetId === myWalletId) return alert("Kendi kendinize bağlanamazsınız.");
             
             setStatus('Aranıyor...', 'bg-yellow-500');
+            // BAĞLANTI FIX: Agresif zaman aşımı sayacı (Timeout) kaldırıldı. Artık tarayıcı kendi hızıyla rahatça bağlanacak.
             const conn = peer.connect(targetId, { reliable: true });
             setupConnection(conn);
-
-            if (connectionTimeout) clearTimeout(connectionTimeout);
-            
-            connectionTimeout = setTimeout(() => {
-                if (activeConnection && !activeConnection.open) {
-                    activeConnection.close();
-                    activeConnection = null;
-                    setStatus('Zaman Aşımı', 'bg-red-500');
-                    alert("Bağlantı zaman aşımına uğradı. Karşı tarafın uygulamasının tam olarak açık olduğundan veya girdiğiniz ID'nin doğruluğundan emin olun.");
-                }
-            }, 15000); 
         });
 
         function disconnectPeer() {
@@ -654,7 +598,6 @@
             document.getElementById('transfer-ui').classList.add('hidden');
             setStatus('Ağa Bağlı', 'bg-green-500');
             document.getElementById('target-id').value = '';
-            if (connectionTimeout) clearTimeout(connectionTimeout);
         }
 
         document.getElementById('disconnect-btn').addEventListener('click', () => {
@@ -663,24 +606,51 @@
             }
         });
 
-        function setupConnection(conn) {
+        // YENİ: Bağlantı Kurulumu (Download mantığıyla birleşti)
+        function setupConnection(conn, isDownloader = false, requestedFileId = null) {
+            // Görsel olarak (UI) sadece son bağlanan kişiyi aktif olarak gösteriyoruz, ama arkaplanda herkes çalışır.
             activeConnection = conn;
+            
             conn.on('open', () => {
-                if (connectionTimeout) clearTimeout(connectionTimeout); 
                 setStatus('Eşleşildi', 'bg-blue-500');
                 document.getElementById('transfer-ui').classList.remove('hidden');
                 document.getElementById('connected-peer-id').innerText = conn.peer;
+
+                // Eğer biz host edilen bir dosyayı indirmeye geldiysek, dosyayı talep et
+                if (isDownloader && requestedFileId) {
+                    conn.send({ type: 'request-file', fileId: requestedFileId });
+                    addTransferItem('req_'+Date.now(), 'Bulut Dosyası İsteniyor...', 0, 'Gelen');
+                }
             });
 
-            conn.on('data', handleIncomingData);
-
-            conn.on('close', () => {
-                disconnectPeer(); 
-            });
+            conn.on('data', (data) => handleIncomingData(data, conn));
+            conn.on('close', () => disconnectPeer());
         }
 
-        function handleIncomingData(data) {
-            if (data.type === 'file-header') {
+        // YENİ: Gelen Veriyi İşleme (Conn objesi ile beraber)
+        function handleIncomingData(data, conn) {
+            // Biri bizden host ettiğimiz bir dosyayı istiyor! (MediaFire Mantığı)
+            if (data.type === 'request-file') {
+                if (!db) return conn.send({ type: 'error', message: 'Sunucu veritabanı hazır değil.' });
+                
+                const tx = db.transaction('files', 'readonly');
+                tx.objectStore('files').get(data.fileId).onsuccess = (e) => {
+                    const record = e.target.result;
+                    if (record) {
+                        const fileObj = new File([record.blob], record.name, { type: record.type });
+                        // Dosyayı bizi talep eden özel connection üzerinden gönderiyoruz
+                        sendFileToConn(fileObj, conn);
+                    } else {
+                        conn.send({ type: 'error', message: 'Aradığınız dosya sunucuda bulunamadı veya silinmiş.' });
+                    }
+                };
+            }
+            // Karşıdan hata mesajı geldiyse
+            else if (data.type === 'error') {
+                alert("Karşı Taraftan Mesaj: " + data.message);
+            }
+            // Standart Dosya Alma İşlemleri
+            else if (data.type === 'file-header') {
                 incomingFileInfo = data;
                 incomingFileData = [];
                 incomingBytesReceived = 0;
@@ -693,25 +663,26 @@
 
                 if (incomingBytesReceived === incomingFileInfo.size) {
                     const blob = new Blob(incomingFileData, { type: incomingFileInfo.fileType });
-                    
                     fileMemoryCache[incomingFileInfo.id] = { name: incomingFileInfo.name, size: incomingFileInfo.size, type: incomingFileInfo.fileType, blob: blob };
-                    
                     completeTransferItem(incomingFileInfo.id);
                     incomingFileInfo = null;
                 }
             }
         }
 
+        // Geleneksel Send File (Aktif arayüzdeki kullanıcıya yollar)
         async function sendFile(file) {
             if (!activeConnection || !activeConnection.open) return alert("Önce bir bağlantı kurmalısınız.");
+            sendFileToConn(file, activeConnection);
+        }
 
+        // YENİ: Spesifik Bir Bağlantıya Dosya Yollama (Arkaplanda başkalarına dosya sunabilmek için)
+        async function sendFileToConn(file, targetConn) {
             const fileId = 'file_' + Date.now();
-            
             fileMemoryCache[fileId] = { name: file.name, size: file.size, type: file.type, blob: file };
-            
             addTransferItem(fileId, file.name, file.size, 'Giden');
 
-            activeConnection.send({ type: 'file-header', id: fileId, name: file.name, size: file.size, fileType: file.type });
+            targetConn.send({ type: 'file-header', id: fileId, name: file.name, size: file.size, fileType: file.type });
 
             let offset = 0;
             const reader = new FileReader();
@@ -723,7 +694,7 @@
 
             reader.onload = (e) => {
                 const chunk = e.target.result;
-                activeConnection.send({ type: 'file-chunk', id: fileId, chunk: chunk });
+                targetConn.send({ type: 'file-chunk', id: fileId, chunk: chunk });
                 offset += chunk.byteLength;
                 updateProgress(fileId, (offset / file.size) * 100);
 
@@ -733,6 +704,7 @@
             readNextChunk();
         }
 
+        // Kasadan aktif arayüzdeki kullanıcıya yollama
         function sendFromVault(fileId) {
             if (!activeConnection) return alert("Önce transfer ekranından bir cihaza bağlanın.");
             const tx = db.transaction('files', 'readonly');
@@ -741,7 +713,7 @@
                 if(record) {
                     switchTab('transfer');
                     const fileObj = new File([record.blob], record.name, { type: record.type });
-                    sendFile(fileObj);
+                    sendFileToConn(fileObj, activeConnection);
                 }
             };
         }
@@ -765,11 +737,9 @@
                             </div>
                         </div>
                         <div class="flex gap-1">
-                            <!-- YENİ: Native Share Butonu (Aktarım Geçmişi için) -->
                             <button id="share-btn-${id}" onclick="shareFromMemory('${id}')" class="hidden shrink-0 w-8 h-8 items-center justify-center rounded-full bg-purple-900/30 hover:bg-purple-600 border border-purple-900 text-purple-400 hover:text-white transition-colors" title="Cihaz Menüsüyle Paylaş (Bluetooth/AirDrop vb.)">
                                 <i class="ph ph-share-network"></i>
                             </button>
-
                             <button id="download-btn-${id}" onclick="downloadFromMemory('${id}')" class="hidden shrink-0 w-8 h-8 items-center justify-center rounded-full bg-blue-900/30 hover:bg-blue-600 border border-blue-900 text-blue-400 hover:text-white transition-colors" title="Cihaza İndir">
                                 <i class="ph ph-download-simple"></i>
                             </button>
@@ -819,20 +789,14 @@
 
         function downloadFromMemory(id) {
             const fileData = fileMemoryCache[id];
-            if (fileData) {
-                downloadFile(fileData.blob, fileData.name);
-            } else {
-                alert("Dosya bellekte bulunamadı. Sayfayı yenilediyseniz kaybolmuş olabilir.");
-            }
+            if (fileData) downloadFile(fileData.blob, fileData.name);
+            else alert("Dosya bellekte bulunamadı.");
         }
 
         function shareFromMemory(id) {
             const fileData = fileMemoryCache[id];
-            if (fileData) {
-                invokeNativeShare(fileData.blob, fileData.name);
-            } else {
-                alert("Dosya bellekte bulunamadı.");
-            }
+            if (fileData) invokeNativeShare(fileData.blob, fileData.name);
+            else alert("Dosya bellekte bulunamadı.");
         }
 
         function setStatus(text, colorClass) {
