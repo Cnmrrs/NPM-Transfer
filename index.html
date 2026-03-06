@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NPM Transfer & Kasa</title>
+    <title>NPM Transfer </title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons -->
@@ -42,10 +42,6 @@
     <!-- Header (Sticky Top) -->
     <header class="bg-npm-dark border-b border-gray-800 p-3 flex items-center justify-between z-20 shrink-0">
         <div class="flex items-center gap-2 sm:gap-3">
-            <!-- YENİ: NPM Uygulamaları Butonu -->
-            <button id="apps-menu-btn" class="text-gray-400 hover:text-white transition-colors p-1" title="NPM Uygulamaları">
-                <i class="ph ph-squares-four text-2xl"></i>
-            </button>
             <div class="bg-npm-red p-1.5 rounded text-white flex items-center justify-center w-8 h-8">
                 <i class="ph ph-package text-xl"></i>
             </div>
@@ -96,10 +92,11 @@
                         <i class="ph ph-plugs-connected text-npm-red"></i> Adrese Bağlan
                     </h2>
                     <div class="flex gap-2">
-                        <!-- YENİ: Sabit NPM- Prefix'li Input Alanı -->
+                        <!-- Sabit NPM- Prefix'li Input Alanı -->
                         <div class="flex-1 bg-npm-darker border border-gray-700 rounded-lg flex items-center focus-within:border-npm-red transition-colors px-3 py-3 overflow-hidden cursor-text" onclick="document.getElementById('target-id').focus()">
                             <span class="text-gray-500 font-mono text-sm select-none font-bold">NPM-</span>
-                            <input type="text" id="target-id" placeholder="XXXXX" maxlength="5"
+                            <!-- maxlength 10 yapıldı ki NPM-XXXXX kopyalayıp yapıştırılırsa kırpılmasın -->
+                            <input type="text" id="target-id" placeholder="XXXXX" maxlength="10"
                                 class="bg-transparent text-white font-mono focus:outline-none uppercase w-full text-sm ml-1 placeholder-gray-600">
                         </div>
                         <button id="connect-btn" class="bg-npm-red hover:bg-red-700 text-white font-bold px-4 rounded-lg transition-colors flex items-center justify-center shrink-0">
@@ -198,8 +195,55 @@
         </div>
     </div>
 
+    <!-- YENİ: NPM Uygulamaları Modalı -->
+    <div id="apps-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-npm-panel border border-gray-700 rounded-xl w-full max-w-xl p-5 shadow-2xl relative animate-fade-in">
+            <button onclick="closeAppsModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors bg-gray-800 p-1.5 rounded-md hover:bg-gray-700">
+                <i class="ph ph-x text-xl"></i>
+            </button>
+            <h2 class="text-lg font-bold text-white mb-5 flex items-center gap-2">
+                <i class="ph-fill ph-squares-four text-npm-red"></i> NPM Uygulamaları
+            </h2>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Oyunlar Kategorisi -->
+                <div class="bg-npm-darker p-3 rounded-xl border border-gray-700 shadow-md">
+                    <h3 class="text-xs text-gray-400 font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <i class="ph-fill ph-game-controller text-npm-red text-base"></i> Oyunlar
+                    </h3>
+                    <div class="flex flex-col gap-1.5">
+                        <a href="https://cnmrrs.github.io/hizli-tikla" target="_blank" class="group flex justify-between items-center text-sm text-gray-300 hover:text-white hover:bg-gray-800 p-2.5 rounded-lg transition-colors border border-transparent hover:border-gray-600">
+                            <span class="font-medium">Hızlı Tıkla</span>
+                            <i class="ph ph-arrow-up-right text-gray-500 group-hover:text-npm-red transition-colors"></i>
+                        </a>
+                        <a href="https://cnmrrs.github.io/square-strategy" target="_blank" class="group flex justify-between items-center text-sm text-gray-300 hover:text-white hover:bg-gray-800 p-2.5 rounded-lg transition-colors border border-transparent hover:border-gray-600">
+                            <span class="font-medium">Square Strategy</span>
+                            <i class="ph ph-arrow-up-right text-gray-500 group-hover:text-npm-red transition-colors"></i>
+                        </a>
+                    </div>
+                </div>
+                <!-- Yardımcı Kategori -->
+                <div class="bg-npm-darker p-3 rounded-xl border border-gray-700 shadow-md">
+                    <h3 class="text-xs text-gray-400 font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <i class="ph-fill ph-wrench text-blue-500 text-base"></i> Yardımcı
+                    </h3>
+                    <div class="flex flex-col gap-1.5">
+                        <a href="https://cnmrrs.github.io/NPM-Wallet" target="_blank" class="group flex justify-between items-center text-sm text-gray-300 hover:text-white hover:bg-gray-800 p-2.5 rounded-lg transition-colors border border-transparent hover:border-gray-600">
+                            <span class="font-medium">NPM Wallet</span>
+                            <i class="ph ph-arrow-up-right text-gray-500 group-hover:text-blue-500 transition-colors"></i>
+                        </a>
+                        <a href="https://cnmrrs.github.io/NPM-Butce" target="_blank" class="group flex justify-between items-center text-sm text-gray-300 hover:text-white hover:bg-gray-800 p-2.5 rounded-lg transition-colors border border-transparent hover:border-gray-600">
+                            <span class="font-medium">NPM Bütçe</span>
+                            <i class="ph ph-arrow-up-right text-gray-500 group-hover:text-blue-500 transition-colors"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bottom Navigation (Mobile & Desktop) -->
-    <nav class="fixed bottom-0 w-full bg-npm-darker border-t border-gray-800 px-6 py-2 pb-safe z-40 flex justify-around sm:justify-center sm:gap-16 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+    <nav class="fixed bottom-0 w-full bg-npm-darker border-t border-gray-800 px-2 py-2 pb-safe z-40 flex justify-around sm:justify-center sm:gap-12 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
         <button onclick="switchTab('transfer')" id="nav-transfer" class="flex flex-col items-center p-2 tab-active transition-colors w-20">
             <i class="ph ph-swap text-2xl mb-1"></i>
             <span class="text-[10px] font-medium uppercase tracking-wider">Transfer</span>
@@ -208,9 +252,23 @@
             <i class="ph ph-folder-star text-2xl mb-1"></i>
             <span class="text-[10px] font-medium uppercase tracking-wider">Kasa</span>
         </button>
+        <button onclick="openAppsModal()" id="nav-apps" class="flex flex-col items-center p-2 text-gray-500 hover:text-gray-300 transition-colors w-20 relative">
+            <i class="ph ph-squares-four text-2xl mb-1"></i>
+            <span class="text-[10px] font-medium uppercase tracking-wider">Uygulamalar</span>
+        </button>
     </nav>
 
     <script>
+        // ==========================================
+        // UI: NPM Uygulamaları Modalı Kontrolü
+        // ==========================================
+        function openAppsModal() {
+            document.getElementById('apps-modal').classList.remove('hidden');
+        }
+        function closeAppsModal() {
+            document.getElementById('apps-modal').classList.add('hidden');
+        }
+
         // ==========================================
         // 1. VERİTABANI YÖNETİMİ (INDEXED DB)
         // ==========================================
@@ -308,7 +366,7 @@
 
             if(Object.keys(categories).length === 0) {
                 container.innerHTML = `<div class="text-center p-8 border border-gray-800 border-dashed rounded-xl bg-npm-darker"><i class="ph ph-folder-open text-4xl text-gray-600 mb-2"></i><p class="text-gray-500 text-sm">Kasada hiç dosya yok.</p></div>`;
-                zipBtn.classList.add('hidden'); // Kasa boşsa ZIP butonunu gizle
+                zipBtn.classList.add('hidden'); 
                 return;
             }
 
@@ -448,11 +506,11 @@
         };
 
         const myWalletId = generateWalletId();
-        
         document.getElementById('my-id').innerText = myWalletId;
 
         let peer = null;
         let activeConnection = null;
+        let connectionTimeout = null; // Zaman aşımı kontrolcüsü
 
         let reconnectAttempts = 0;
         const MAX_RECONNECT = 5;
@@ -463,7 +521,6 @@
         let incomingBytesReceived = 0;
 
         function initPeer() {
-            // YENİ: Bağlantı gücünü artırmak için Google STUN sunucuları eklendi
             peer = new Peer(myWalletId, { 
                 debug: 0,
                 config: {
@@ -483,7 +540,6 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 const connectId = urlParams.get('connect');
                 if (connectId && connectId !== myWalletId) {
-                    // Sadece koddaki 5 harfli kısmı input'a aktarıyoruz, NPM- ön eki arayüzde sabit
                     document.getElementById('target-id').value = connectId.replace('NPM-', '');
                     setTimeout(() => document.getElementById('connect-btn').click(), 500);
                     window.history.replaceState({}, document.title, window.location.pathname);
@@ -492,8 +548,9 @@
 
             peer.on('error', (err) => {
                 if (err.type === 'peer-unavailable') {
+                    if (connectionTimeout) clearTimeout(connectionTimeout);
                     setStatus('Hata!', 'bg-red-500');
-                    alert("NPM Adresi bulunamadı veya çevrimdışı.");
+                    alert("Girdiğiniz NPM Adresi bulunamadı veya şu an aktif değil.");
                 } else if (err.type === 'network' || err.type === 'server-error' || err.type === 'unavailable-id') {
                     setStatus('Sunucu Hatası', 'bg-red-500');
                 } else {
@@ -527,15 +584,32 @@
         }
 
         document.getElementById('connect-btn').addEventListener('click', () => {
-            // YENİ: Girilen koda 'NPM-' ön ekini programatik olarak ekliyoruz
-            const inputVal = document.getElementById('target-id').value.trim().toUpperCase();
+            let inputVal = document.getElementById('target-id').value.trim().toUpperCase();
+            
+            // Eğer kullanıcı "NPM-XXXXX" diye tümünü kopyaladıysa, NPM- kısmını otomatik temizle
+            if (inputVal.startsWith('NPM-')) {
+                inputVal = inputVal.substring(4);
+            }
             if (!inputVal) return;
             
             const targetId = 'NPM-' + inputVal;
             if (targetId === myWalletId) return alert("Kendi kendinize bağlanamazsınız.");
             
             setStatus('Aranıyor...', 'bg-yellow-500');
-            setupConnection(peer.connect(targetId, { reliable: true }));
+            const conn = peer.connect(targetId, { reliable: true });
+            setupConnection(conn);
+
+            // Bağlantı kopmalarına ve takılmalara karşı 15 saniye limiti eklendi
+            if (connectionTimeout) clearTimeout(connectionTimeout);
+            
+            connectionTimeout = setTimeout(() => {
+                if (activeConnection && !activeConnection.open) {
+                    activeConnection.close();
+                    activeConnection = null;
+                    setStatus('Zaman Aşımı', 'bg-red-500');
+                    alert("Bağlantı zaman aşımına uğradı. Karşı tarafın uygulamasının tam olarak açık olduğundan veya girdiğiniz ID'nin doğruluğundan emin olun.");
+                }
+            }, 15000); // 15 Saniye
         });
 
         function disconnectPeer() {
@@ -546,6 +620,7 @@
             document.getElementById('transfer-ui').classList.add('hidden');
             setStatus('Ağa Bağlı', 'bg-green-500');
             document.getElementById('target-id').value = '';
+            if (connectionTimeout) clearTimeout(connectionTimeout);
         }
 
         document.getElementById('disconnect-btn').addEventListener('click', () => {
@@ -557,6 +632,7 @@
         function setupConnection(conn) {
             activeConnection = conn;
             conn.on('open', () => {
+                if (connectionTimeout) clearTimeout(connectionTimeout); // Başarılı olursa sayacı iptal et
                 setStatus('Eşleşildi', 'bg-blue-500');
                 document.getElementById('transfer-ui').classList.remove('hidden');
                 document.getElementById('connected-peer-id').innerText = conn.peer;
